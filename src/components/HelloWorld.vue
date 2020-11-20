@@ -31,6 +31,8 @@ export default {
             Cesium.Ion.defaultAccessToken =
                 "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkMGUzMGM5OS1lNmRiLTQyYWEtYThlNy0wMzYxNDJhOTM1YzMiLCJpZCI6MTcyMDAsInNjb3BlcyI6WyJhc2wiLCJhc3IiLCJhc3ciLCJnYyJdLCJpYXQiOjE1OTM2NTQ5MDV9.2aIpnr5UbOznMgMGffRcjy5ld0Hb31g50FwF9ncuM38";
             var viewer = new Cesium.Viewer("cesiumContainer", {
+                baseLayerPicker: false,
+                shouldAnimate: true,
                 terrainProvider: new Cesium.CesiumTerrainProvider({
                     url: Cesium.IonResource.fromAssetId(1),
                 }),

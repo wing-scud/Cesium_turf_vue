@@ -3,13 +3,16 @@
     <el-button type="primary" @click="handclick" class="bar">选取坐标</el-button>
     <el-input-number v-model="cellside" :step="0.01" placeholder="单位间距" class="bar"></el-input-number>
     <el-button type="primary" @click="calculate" class="bar">计算</el-button>
-    <el-button type="primary" @click="generate" class="bar">生成canvas</el-button>
+    <el-button type="primary" @click="createMaterial" class="bar">canvas添加至entity</el-button>
+    <el-button type="primary" @click="generate" class="bar">生成图片</el-button>
     <el-button type="primary" @click="clear" class="bar">清空</el-button>
 </div>
 </template>
 
 <script>
+import { degreesToRadians } from '@turf/turf';
 const Cesium = require("cesium/Cesium");
+import texture from '../js/texture'
 export default {
     name: "Gradient",
     props: ["_viewer"],
@@ -36,13 +39,15 @@ export default {
             //       var cartographic =Cesium.Cartographic.fromCartesian(position);
             //       return [Cesium.Math.toDegrees(cartographic)]
             //   })
-            this._screenHandler.removeInputAction(
-                Cesium.ScreenSpaceEventType.LEFT_CLICK
-            );
+            // this._screenHandler.removeInputAction(
+            //     Cesium.ScreenSpaceEventType.LEFT_CLICK
+            // );
             this.drawSlopePolygon(...this.positions);
         },
         handclick() {
             let viewer = this._viewer;
+
+            viewer.scene.globe.depthTestAgainstTerrain = true
             // viewer.camera.setView({
             //     destination: new Cesium.Cartesian3(
             //         581273.1305004816,
@@ -56,15 +61,20 @@ export default {
             viewer.scene.primitives.add(points);
             this._screenHandler = screenHandler;
             screenHandler.setInputAction(function (e) {
-                var earthPosition = viewer.scene.pickPosition(e.position);
-                var cartographic = Cesium.Cartographic.fromCartesian(earthPosition);
-                var longitude = Cesium.Math.toDegrees(cartographic.longitude);
-                var latitude = Cesium.Math.toDegrees(cartographic.latitude);
-                instance.positions.push([longitude, latitude]);
-                points.add({
-                    position: earthPosition,
-                    color: Cesium.Color.YELLOW,
-                });
+                var pick = viewer.scene.pick(e.position);
+                if (Cesium.defined(pick)) {
+                    console.log("slopeDegrees", pick.primitive.id)
+                } else {
+                    var earthPosition = viewer.scene.pickPosition(e.position);
+                    var cartographic = Cesium.Cartographic.fromCartesian(earthPosition);
+                    var longitude = Cesium.Math.toDegrees(cartographic.longitude);
+                    var latitude = Cesium.Math.toDegrees(cartographic.latitude);
+                    instance.positions.push([longitude, latitude]);
+                    points.add({
+                        position: earthPosition,
+                        color: Cesium.Color.YELLOW,
+                    });
+                }
             }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
         },
         //绘制小矩形面 四个经纬度的点，z值高度可以忽略 如：113.xx  ,37.xx,0 ,113.xx,37.xx,0
@@ -74,6 +84,7 @@ export default {
                 [position1, position2, position3, position4, position1],
             ]);
             var bbox = turf.bbox(polygon);
+            instance.positions = turf.getCoords(polygon)
             var cellSide = this.cellside;
             var gridCell = Math.sqrt(cellSide * 1000);
             var options = { units: "kilometers" };
@@ -137,49 +148,53 @@ export default {
                     var maxGradient = 0;
                     var direction;
                     //Horn算法
-                    //     let westNorthHeight = updatedPositions[i + 0].height;
-                    //     let northHeight = updatedPositions[i + 1].height;
-                    //     let eastNorthHeight = updatedPositions[i + 2].height;
-                    //     let eastHeight = updatedPositions[i + 3].height;
+                    let westNorthHeight = updatedPositions[i + 0].height;
+                    let northHeight = updatedPositions[i + 1].height;
+                    let eastNorthHeight = updatedPositions[i + 2].height;
+                    let eastHeight = updatedPositions[i + 3].height;
 
-                    //     let eastSouthHeight = updatedPositions[i + 4].height;
-                    //     let southHeight = updatedPositions[i + 5].height;
-                    //     let westSouthHeight = updatedPositions[i + 6].height;
-                    //     let westHeight = updatedPositions[i + 7].height;
+                    let eastSouthHeight = updatedPositions[i + 4].height;
+                    let southHeight = updatedPositions[i + 5].height;
+                    let westSouthHeight = updatedPositions[i + 6].height;
+                    let westHeight = updatedPositions[i + 7].height;
 
-                    //     //calculate slope using its 8 neighbors
-                    //     var dzdx = (((eastNorthHeight + (2 * eastHeight) + eastSouthHeight)) - ((westNorthHeight + (2 * westHeight) + westSouthHeight))) / (8 * gridCell);
-                    //     var dzdy = (((westSouthHeight + (2 * southHeight) + eastSouthHeight)) - ((westNorthHeight + (2 * northHeight) + eastNorthHeight))) / (8 * gridCell);
-                    //     var riseRun = Math.sqrt(Math.pow(dzdx, 2) + Math.pow(dzdy, 2));
-                    //     console.log("horn", riseRun)
-                    //     var slopeDegrees = Math.atan(riseRun) * (180 / Math.PI);
-                    //     let north = (westNorthHeight + 2 * northHeight + eastNorthHeight);
-                    //     let south = (westSouthHeight + 2 * southHeight + eastSouthHeight);
-                    //     let east = (eastNorthHeight + 2 * eastHeight + eastSouthHeight);
-                    //     let west = (westNorthHeight * +westHeight * 2 + westSouthHeight)
-                    //   let slopeDirection =Math.atan(-(south - north) / (west - east));
-                    //    // slopeDirection = slopeDirection < 0 ? slopeDirection + Cesium.Math.PI : slopeDirection
-                    //   //  slopeDirection = Cesium.Math.toDegrees(slopeDirection)
-                    //     console.log("slopeDirection", slopeDirection)
-                    //     var point = turf.point([Cesium.Math.toDegrees(center.longitude), Cesium.Math.toDegrees(center.latitude)]);
-                    //     var distance = cellSide;
-                    //     var bearing = slopeDirection;
-                    //     var options = { units: 'kilometers' };
-                    //     var destination = turf.destination(point, distance, bearing, options);
-                    //     let result = turf.getCoord(destination)
-                    //     var carto = Cesium.Cartographic.fromDegrees(result[0], result[1]);
-                    //     viewer.entities.add({
-                    //         polyline: {
-                    //             clampToGround: true,
-                    //             positions: [Cesium.Cartesian3.fromRadians(center.longitude, center.latitude, center.height),
-                    //                 Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, carto.height)
-                    //             ],
-                    //             width: 20,
-                    //             material: new Cesium.PolylineArrowMaterialProperty(
-                    //                 Cesium.Color.BLUE
-                    //             ),
-                    //         }
-                    //     })
+                    //calculate slope using its 8 neighbors
+                    var dzdx = (((eastNorthHeight + (2 * eastHeight) + eastSouthHeight)) - ((westNorthHeight + (2 * westHeight) + westSouthHeight))) / (8 * gridCell);
+                    var dzdy = (((westSouthHeight + (2 * southHeight) + eastSouthHeight)) - ((westNorthHeight + (2 * northHeight) + eastNorthHeight))) / (8 * gridCell);
+                    var riseRun = Math.sqrt(Math.pow(dzdx, 2) + Math.pow(dzdy, 2));
+                    console.log("riseRun", riseRun)
+                    var slopeDegrees = Math.atan(riseRun) * (180 / Math.PI);
+                    console.log("slopeDegrees", slopeDegrees)
+                    let north = (westNorthHeight + 2 * northHeight + eastNorthHeight);
+                    let south = (westSouthHeight + 2 * southHeight + eastSouthHeight);
+                    let east = (eastNorthHeight + 2 * eastHeight + eastSouthHeight);
+                    let west = (westNorthHeight * +westHeight * 2 + westSouthHeight)
+                    let slopeDirection = Math.atan((south - north) / (west - east));
+                    //   slopeDirection = slopeDirection < 0 ? slopeDirection + Cesium.Math.PI : slopeDirection
+                    slopeDirection = Cesium.Math.toDegrees(slopeDirection)
+                    console.log("slopeDirection", slopeDirection)
+                    // var point = turf.point([Cesium.Math.toDegrees(center.longitude), Cesium.Math.toDegrees(center.latitude)]);
+                    // var distance = cellSide;
+                    // var bearing = slopeDirection;
+                    // var options = { units: 'kilometers' };
+                    // var destination = turf.destination(point, distance, bearing, options);
+                    // let result = turf.getCoord(destination)
+                    // var carto = Cesium.Cartographic.fromDegrees(result[0], result[1]);
+                    // viewer.entities.add({
+                    //     polyline: {
+                    //         clampToGround: true,
+                    //         positions: [Cesium.Cartesian3.fromRadians(center.longitude, center.latitude, center.height),
+                    //             Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, carto.height)
+                    //         ],
+                    //         width: 20,
+                    //         material: new Cesium.PolylineArrowMaterialProperty(
+                    //             Cesium.Color.BLUE
+                    //         ),
+                    //     }
+                    // })
+                    gradients.push(riseRun);
+                    //----
+
                     var array = []
                     for (let j = i; j < i + 8; j++) {
                         let gradient =
@@ -233,16 +248,17 @@ export default {
                     directions.push(direction);
                     gradients.push(maxGradient);
                     console.log("maxGradient", maxGradient);
-                    // points.add(
-                    //     new Cesium.PointPrimitive({
-                    //         position: Cesium.Cartesian3.fromRadians(
-                    //             center.longitude,
-                    //             center.latitude,
-                    //             center.height
-                    //         ),
-                    //         color: Cesium.Color.RED,
-                    //     })
-                    // );
+                    var point = points.add(
+                        new Cesium.PointPrimitive({
+                            position: Cesium.Cartesian3.fromRadians(
+                                center.longitude,
+                                center.latitude,
+                                center.height
+                            ),
+                            id: slopeDegrees + "__" + Cesium.Math.toDegrees(maxGradient),
+                            color: Cesium.Color.RED,
+                        })
+                    );
                     // viewer.entities.add({
                     //     polyline: {
                     //         clampToGround: true,
@@ -287,21 +303,22 @@ export default {
                     var slope = gradients[y * w + x];
                     let slopecolor;
                     if (0 <= slope && slope < 0.29) {
-                        slopecolor = "#F0F8FF";
+                        slopecolor = "#FFF5EE";
                     } else if (0.29 <= slope && slope < 0.5) {
-                        slopecolor = "#4169E1";
+                        slopecolor = "#FFF5EE";
                     } else if (0.5 <= slope && slope < Math.sqrt(2) / 2) {
-                        slopecolor = "#EEE8AA";
+                        slopecolor = "#FFF5EE";
                     } else if (Math.sqrt(2) / 2 <= slope && slope < 0.87) {
-                        slopecolor = "#FFFF00";
+                        slopecolor = "#FFF5EE";
                     } else if (0.87 <= slope && slope < 0.91) {
-                        slopecolor = "#EE82EE";
+                        slopecolor = "#DC143C";
                     } else if (0.91 <= slope && slope < 0.95) {
-                        slopecolor = "#FF1493";
+                        slopecolor = "#DC143C";
                     } else {
                         slopecolor = "#DC143C";
                     }
-                    var height = this.directions[y * w + x].height
+                    var height = 0
+                    //    var height = this.directions[y * w + x].height
                     var rgbaArray = this.sixTeenToRgba(slopecolor, height);
                     var bitmapIndex = y * w * 4 + x * 4
                     bitmap[bitmapIndex + 0] = rgbaArray[0]
@@ -329,6 +346,25 @@ export default {
             let canvas = this.toCanvas();
             canvas.className = "imgSlope"
             document.body.appendChild(canvas)
+        },
+        createMaterial() {
+            let canvas = this.toCanvas();
+            //  let ctx= canvas.getContext('2d')
+            //   ctx.rotate(Math.PI/2);
+            let viewer = this._viewer;
+            let positions = this.positions[0].map((position) => Cesium.Cartesian3.fromDegrees(position[0], position[1]));
+            positions.pop();
+            var polygon = viewer.entities.add({
+                polygon: {
+                    hierarchy: new Cesium.PolygonHierarchy(positions),
+                    material: new Cesium.ImageMaterialProperty({
+                        image: canvas,
+                        // color: Cesium.Color.BLUE,
+                        //  repeat: new Cesium.Cartesian2(4, 4)
+                    }),
+                    classificationType: Cesium.ClassificationType.BOTH,
+                },
+            });
         }
     },
     mounted() {
